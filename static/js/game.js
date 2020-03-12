@@ -1,41 +1,348 @@
-class BackgroundScene extends Phaser.Scene {
-    constructor() {
-        super("backgroundScene")
+class GameInfoText extends Phaser.GameObjects.Text {
+	constructor (scene, x, y, text, style) {
+		if (!text) {
+			text = `William Shakespeare (bapt. 26 April 1564 – \n
+			23 April 1616)[a] was an English poet, \n 
+			playwright, and actor, \n 
+			widely regarded as the greatest writer in \n 
+			the English language and the world's greatest dramatist. \n 
+			He is often called England's national poet \n 
+			and the "Bard of Avon" (or simply "the Bard").\n 
+			His extant works, \n 
+			including collaborations, \n 
+			consist of some 39 plays, 154 sonnets, two long narrative \n 
+			poems, and a few other verses, \n 
+			some of uncertain authorship. \n 
+			His plays have been translated \n 
+			into every major living language and \n 
+			are performed more often than those of any other playwright.`
+		}
+
+		if (!style) {
+    		style = { 
+    			fill: '#0f0', 
+    			fontFamily: '"Press Start 2P"', 
+    			fontSize: '15px'
+    		}
+    	}
+
+    	super(scene, x, y, text, style)
+
+    	this.lineSpacing = -20;
+    	this.setOrigin(0.5);
+	} 
+}
+
+class GameButton extends Phaser.GameObjects.Text {
+    constructor(scene, x, y, text, style) {
+    	if (!style) {
+    		style = { 
+    			fill: '#0f0', 
+    			fontFamily: '"Press Start 2P"', 
+    			fontSize: '25px' 
+    		}
+    	}
+        super(scene, x, y, text, style)
+        this.setInteractive({ useHandCursor: true })
+        .on('pointerover', () => this.enterButtonHoverState())
+        .on('pointerout', () => this.enterButtonRestState())
+        .on('pointerdown', () => this.enterButtonActiveState())
+        .on('pointerup', () => {
+        	this.enterButtonHoverState();
+        	this.action()
+        })
     }
 
-    init(data){
-        this.score = data.score;
+    enterButtonHoverState() {
+        this.setStyle({ fill: '#4fffa7'});
+    }
+
+    enterButtonRestState() {
+        this.setStyle({ fill: '#0f0'});
+    }
+
+    enterButtonActiveState() {
+        this.setStyle({ fill: '#0ff' });
+    }
+
+    action() {
+    	console.log('Action')
+    }
+}
+
+class GameStartButton extends GameButton {
+	constructor(scene, x, y, text, style) {
+        super(scene, x, y, text, style)
+     	this.setOrigin(0.5);
+    }
+
+	action() {
+    	console.log('Starting the game')
+    	this.scene.scene.start('gameScene');
+    }
+}
+
+class GameExitButton extends GameButton {
+	constructor(scene, x, y, text, style) {
+        super(scene, x, y, text, style)
+     	this.setOrigin(0.5);
+    }
+
+    action() {
+    	console.log('Exiting the game')
+    	this.scene.scene.start('backgroundScene');
+    }
+}
+
+class GameInfoButton extends GameButton {
+	constructor(scene, x, y, text, style) {
+        super(scene, x, y, text, style)
+     	this.setOrigin(0.5);
+    }
+
+ 	action() {
+    	console.log('Game info')
+    	this.scene.scene.start('infoScene');
+    }
+}
+
+class Bullet extends Phaser.Physics.Arcade.Sprite {
+	constructor(scene, x, y) {
+        super(scene, x, y, 'green-bullet')
+
+        this.speed = 800
+        this.animationFrames = scene.anims.generateFrameNumbers('green-bullet')
+
+        this.animation = scene.anims.create({
+            key: 'greenBulletAnimation',
+            frames: this.animationFrames,
+            frameRate: 20,
+            repeat: -1
+        })
+
+        this.play(this.animation)
+
+       	scene.add.existing(this)
+    	scene.physics.add.existing(this)
+
+    	this.setCollideWorldBounds(true)
+    }
+
+    update() {
+    	this.setVelocityY(-this.speed)
+
+    	if (this.y <= 0 ) {
+    		this.destroy()
+    	}
+    }
+}
+
+class WeaponGun extends Phaser.GameObjects.Sprite {
+	constructor(scene, weapon, x, y, name) {
+        super(scene, x, y, name)
+
+        this.animationFrames = scene.anims.generateFrameNumbers(name)
+
+        this.animation = scene.anims.create({
+            key: name + 'Animation',
+            frames: this.animationFrames,
+            frameRate: 20,
+            repeat: -1
+        })
+
+        this.play(this.animation)
+
+       	scene.add.existing(this)
+    }
+}
+
+class Weapon {
+	constructor(scene, owner) {
+		this.owner = owner
+		this.scene = scene
+		this.firedBullets = this.scene.physics.add.group()
+
+		this.leftGun = new WeaponGun(this.scene, 
+			this, 
+			this.owner.x - this.owner.displayWidth / 2, 
+			this.owner.y - this.owner.displayHeight / 2, 
+			'green-bullet')
+
+		this.rightGun = new WeaponGun(this.scene, 
+			this, 
+			this.owner.x + this.owner.displayWidth / 2, 
+			this.owner.y - this.owner.displayHeight / 2, 
+			'green-bullet')
+	}
+
+	update() {
+		this.leftGun.x = this.owner.x - this.owner.displayWidth / 2
+		this.leftGun.y = this.owner.y 
+
+		this.rightGun.x = this.owner.x + this.owner.displayWidth / 2
+		this.rightGun.y = this.owner.y 
+
+		for (let i = 0; i < this.firedBullets.getChildren().length; i++) {
+        	this.firedBullets.getChildren()[i].update()
+        }
+		
+	}
+
+	shoot() {
+		let bulletRight = new Bullet(this.scene, this.rightGun.x, this.rightGun.y)
+		let bulletLeft = new Bullet(this.scene, this.leftGun.x, this.leftGun.y)
+    	this.firedBullets.add(bulletLeft)
+    	this.firedBullets.add(bulletRight)
+	}
+}
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+	constructor(scene, x, y) {
+        super(scene, x, y, 'player')
+
+        this.speed = 100
+        this.animationFrames = scene.anims.generateFrameNumbers('player')
+        this.cursorKeys = this.scene.cursorKeys
+
+        this.animation = scene.anims.create({
+            key: 'playerAnimation',
+            frames: this.animationFrames,
+            frameRate: 20,
+            repeat: -1
+        })
+
+        this.play(this.animation)
+
+       	scene.add.existing(this)
+    	scene.physics.add.existing(this)
+
+    	this.setCollideWorldBounds(true)
+
+    	this.weapon = new Weapon(scene, this)
+    }
+
+    moveUp() {
+    	this.body.setVelocityY(-this.speed)
+    }
+
+    moveDown() {
+    	this.body.setVelocityY(this.speed)
+    }
+
+    moveLeft() {
+    	this.setVelocityX(-this.speed)
+    }
+
+    moveRight() {
+    	this.setVelocityX(this.speed)
+    }
+
+    shoot() {
+    	this.weapon.shoot()
+    }
+
+    update() {
+   		if (this.cursorKeys.left.isDown) {
+            this.moveLeft()
+        } else if (this.cursorKeys.right.isDown) {
+            this.moveRight()
+        }
+
+        if (this.cursorKeys.up.isDown) {
+            this.moveUp()
+        } else if (this.cursorKeys.down.isDown) {
+            this.moveDown()
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.scene.spaceKey)) {
+            if (this.active) {
+            	this.shoot()
+            }
+        }
+
+        this.weapon.update()
+    }
+}
+
+class InfoScene extends Phaser.Scene {
+	constructor() {
+        super("infoScene")
+        console.log('Info scene created')
     }
 
     preload() {
-        this.backgrundImageTexture = this.load.image('background', '/static/img/background.png')
-        this.greenMobImageTexture = this.load.spritesheet('green-mob', 
-            '/static/img/green_spaceship.png', {
+    	this.canvas = this.sys.game.canvas;
+		this.width = this.sys.game.canvas.width
+		this.height = this.sys.game.canvas.height
+    }
+
+    create() {
+		this.gameExitButton = new GameExitButton(this, this.width / 2, this.height - 50, 'Exit');
+		this.gameInfoText = new GameInfoText(this, this.width / 2, this.height / 2);
+		this.add.existing(this.gameExitButton);
+		this.add.existing(this.gameInfoText);
+	}
+}
+
+class GameScene extends Phaser.Scene {
+	constructor() {
+        super("gameScene")
+        console.log('Game scene created')
+    }
+
+    preload() {
+    	this.canvas = this.sys.game.canvas;
+		this.width = this.sys.game.canvas.width
+		this.height = this.sys.game.canvas.height
+    }
+
+    create() {
+    	this.cursorKeys = this.input.keyboard.createCursorKeys()
+    	this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+		this.gameExitButton = new GameExitButton(this, this.width - 70, 50, 'Exit');
+		this.add.existing(this.gameExitButton);
+
+		this.player = new Player(this, 40, 40)
+	}
+
+	update() {
+		this.player.update()
+	}
+}
+
+class BackgroundScene extends Phaser.Scene {
+	constructor() {
+        super("backgroundScene")
+        console.log('Background scene created')
+    }
+
+	preload() {
+		this.canvas = this.sys.game.canvas;
+		this.width = this.sys.game.canvas.width
+		this.height = this.sys.game.canvas.height
+
+		this.backgrundImageTexture = this.load.image('background', '/static/img/background.png')
+        this.greenMobImageTexture = this.load.spritesheet('green-mob', '/static/img/green_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
-        this.grayMobImageTexture = this.load.spritesheet('gray-mob', 
-            '/static/img/gray_spaceship.png', {
+        this.grayMobImageTexture = this.load.spritesheet('gray-mob', '/static/img/gray_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
-        this.blueMobImageTexture = this.load.spritesheet('blue-mob', 
-            '/static/img/blue_spaceship.png', {
+        this.blueMobImageTexture = this.load.spritesheet('blue-mob', '/static/img/blue_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
-        this.explosionImageTexture = this.load.spritesheet('explosion', 
-            '/static/img/explosion.png', {
+        this.explosionImageTexture = this.load.spritesheet('explosion', '/static/img/explosion.png', {
             frameWidth: 66,
             frameHeight: 66
         })
-        this.greenBulletImageTexture = this.load.spritesheet('green-bullet', 
-            '/static/img/green_bullet.png', {
+        this.greenBulletImageTexture = this.load.spritesheet('green-bullet', '/static/img/green_bullet.png', {
             frameWidth: 36,
             frameHeight: 36
         })
-        this.playerImageTexture = this.load.spritesheet('player', 
-            '/static/img/player.png', {
+        this.playerImageTexture = this.load.spritesheet('player', '/static/img/player.png', {
             frameWidth: 66,
             frameHeight: 66
         })
@@ -44,331 +351,16 @@ class BackgroundScene extends Phaser.Scene {
         this.menuAudio = this.load.audio('menu_audio', '/static/sound/menu.mp3')
         this.explosionAudio = this.load.audio('explosion_audio', '/static/sound/explosion.mp3')
         this.greenBulletAudio = this.load.audio('green_bullet_audio', '/static/sound/green_bullet.mp3')
-    }
+	}
 
-    createStartGameButton() {
-        this.startGameButton = this.add.text(config.scale.width / 2, 
-            config.scale.height / 2 - 150, 'Start the game', {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '32px' 
-        });
-        this.startGameButton.setOrigin(0.5);
-        this.startGameButton.setInteractive();
-        this.startGameButton.on('pointerdown', this.startGame, this);
-        this.startGameButton.on('pointerover', this.boldText);
-        this.startGameButton.on('pointerout', this.unboldText);
-    }
-
-    boldText() {
-        this.setColor('#eb9f34')   
-    }
-
-    unboldText() {
-        this.setColor('white')
-    }
-
-    createAndPlaySound() {
-        this.backgroundSound = this.sound.add('menu_audio', {loop: true})
-        this.backgroundSound.play()
-    }
-
-    createAndDrowImage() {
-        this.backgroundImage = this.add.tileSprite(0, 0, config.scale.width, config.scale.height, 
-            'background')
-        this.backgroundImage.setOrigin(0, 0)
-    }
-
-    startGame() {
-        this.backgroundSound.stop()
-        this.scene.start('gameScene')
-      
-    }
-
-    displayScore() {
-        if (this.score != null && this.score != 'undefined') {
-            this.scoreText = this.add.text(config.scale.width -100, 100, this.score + ' - SCORE', {
-                    fontFamily: '"Press Start 2P"',
-                    fontSize: '16px' 
-            });
-            this.scoreText.setOrigin(1, 0);
-        }
-    }
-
-    create() {
-        this.createAndDrowImage()
-        this.createAndPlaySound()
-        this.createStartGameButton()
-        this.displayScore()
-    }
+	create() {
+		this.gameStartButton = new GameStartButton(this, this.width / 2, this.height / 2 - 50, 'Start the new game');
+		this.gameInfoButton = new GameInfoButton(this, this.width / 2, this.height / 2 + 50, 'Game info');
+		this.add.existing(this.gameStartButton);
+		this.add.existing(this.gameInfoButton);
+	}
 }
 
-
-class GameScene extends Phaser.Scene {
-    constructor() {
-        super("gameScene")
-    }
-
-    preload() {
-    }
-
-    boldText() {
-        this.setColor('#eb9f34')   
-    }
-
-    unboldText() {
-        this.setColor('white')
-    }
-
-    createExitGameButton() {
-        this.exitGameButton = this.add.text(config.scale.width -100, 
-            100, 'Exit', {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '32px' 
-        });
-        this.exitGameButton.setOrigin(1, 0);
-        this.exitGameButton.setInteractive();
-        this.exitGameButton.on('pointerdown', this.exitGame, this);
-        this.exitGameButton.on('pointerover', this.boldText);
-        this.exitGameButton.on('pointerout', this.unboldText);
-    }
-
-    createAndAddMob(textureName, speed = 10) {
-        let x = Phaser.Math.Between(100, config.scale.width - 100)
-        let y = 100
-        let animationName = textureName + '-' + 'animation' 
-        let mobSprite = this.physics.add.sprite(x, y, textureName)
-        
-        mobSprite.angle = 180
-        
-        let mobAnimation = this.anims.create({
-            key: animationName,
-            frames: this.anims.generateFrameNumbers(textureName),
-            frameRate: 20,
-            repeat: -1
-        })
-        
-        mobSprite.play(animationName)
-        mobSprite.setInteractive()
-
-        let mob = {
-            speed: speed,
-            body: mobSprite,
-            mobAnimation: mobAnimation,
-            update: function() {
-                if (this.body.y > config.scale.height) {
-                    this.body.y = 0
-                    let randomX = Phaser.Math.Between(100, config.scale.width - 100)
-                    this.body.x = randomX
-                }
-                this.body.y += this.speed
-            },
-            reset: function() {
-                this.body.y = 0
-                let randomX = Phaser.Math.Between(100, config.scale.width - 100)
-                this.body.x = randomX
-            }
-        }
-
-        return mob
-    }
-
-
-    exitGame() {
-        this.backgroundSound.stop()
-        this.scene.start('backgroundScene', {score: this.score})
-    }
-
-    createAndPlaySound() {
-        this.backgroundSound = this.sound.add('background_audio')
-        this.backgroundSound.play()
-    }
-
-    createAndDrowImage() {
-        this.backgroundImage = this.add.tileSprite(0, 0, config.scale.width, config.scale.height, 
-            'background')
-        this.backgroundImage.setOrigin(0, 0)
-    }
-
-    createMobs() {
-        this.mobBodies = this.physics.add.group()
-
-        let greenMob = this.createAndAddMob('green-mob', 4)
-        let grayMob = this.createAndAddMob('gray-mob', 6)
-        let blueMob = this.createAndAddMob('blue-mob', 9)
-
-        this.mobBodies.add(greenMob.body)
-        this.mobBodies.add(grayMob.body)
-        this.mobBodies.add(blueMob.body)
-
-        this.mobs = [greenMob, grayMob, blueMob]
-
-        return this.mobs
-
-    }
-
-    createPlayer(textureName = 'player', speed = 200,){
-        let x = config.scale.width / 2 - 8
-        let y = config.scale.height / 2 + 300
-        let animationName = textureName + '-' + 'animation' 
-        let playerSprite = this.physics.add.sprite(x, y, textureName)
-        let playerAnimation = this.anims.create({
-            key: animationName,
-            frames: this.anims.generateFrameNumbers(textureName),
-            frameRate: 20,
-            repeat: -1
-        })
-        let defaultBulletSound = this.sound.add('green_bullet_audio')
-        let defaultBulletAnimation = this.anims.create({
-            key: 'green-bullet-animation',
-            frames: this.anims.generateFrameNumbers('green-bullet'),
-            frameRate: 5,
-            repeat: -1
-        })
-        let scene = this
-
-        playerSprite.play(animationName)
-        playerSprite.setCollideWorldBounds(true)
-
-        let spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
-        let cursorKeys = this.input.keyboard.createCursorKeys()
-
-        let player = {
-            bulletBodies: this.physics.add.group(),
-            spaceKey: spaceKey,
-            cursorKeys: cursorKeys,
-            bulletType: {
-                sound: defaultBulletSound,
-                animation: defaultBulletAnimation,
-                speed: 200,
-                create: function() {
-                    let bulletSprite = scene.physics.add.sprite(player.body.x, player.body.y, 'green-bullet')
-                    bulletSprite.play(this.animation)
-                    return bulletSprite
-                },
-                update: function(bullet) {
-                    bullet.setVelocityY(-this.speed)
-                },
-                kill: function(bullet, mob) {
-                    let textureName = 'explosion'
-                    let animationName = textureName + '-' + 'animation' 
-                    let explosionSprite = this.physics.add.sprite(mob.x, mob.y, textureName)
-                    let explosionAnimation = this.anims.create({
-                        key: animationName,
-                        frames: this.anims.generateFrameNumbers(textureName),
-                        frameRate: 20,
-                        repeat: 0
-                    })
-                    scene.explosionSound.play()
-                    explosionSprite.play(explosionAnimation)
-                    scene.score += 15
-                    mob.y = 0
-                    let randomX = Phaser.Math.Between(100, config.scale.width - 100)
-                    mob.x = randomX
-                    bullet.destroy()
-                    scene.time.addEvent({
-                        delay: 600,
-                        callback: function() {
-                            explosionSprite.destroy()
-                        },
-                        callbackScope: this,
-                        loop: false
-                    })
-                }
-            },
-            body: playerSprite,
-            speed: speed,
-            animation: playerAnimation,
-            update: function() {
-                if (this.cursorKeys.left.isDown) {
-                    this.body.setVelocityX(-this.speed)
-                } else if (this.cursorKeys.right.isDown) {
-                    this.body.setVelocityX(this.speed)
-                }
-
-                if (this.cursorKeys.up.isDown) {
-                    this.body.setVelocityY(-this.speed)
-                } else if (this.cursorKeys.down.isDown) {
-                    this.body.setVelocityY(this.speed)
-                }
-
-                if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-                    if (this.body.active) {
-                        this.shoot()
-                    }
-                }
-
-                for (let i = 0; i < this.bulletBodies.getChildren().length; i++) {
-                    this.bulletType.update(this.bulletBodies);
-                }
-
-            },
-            destroy: function(player, mob) {
-                player.x = x
-                player.y = y
-
-                this.mobs.forEach(mob => {
-                    mob.reset()
-                })
-
-                scene.backgroundSound.stop()
-                scene.scene.start('backgroundScene', {score: scene.score})
-            },
-            shoot: function() {
-                scene.greenBulletSound.play()
-                let bullet = this.bulletType.create()
-                this.bulletBodies.add(bullet)
-            }
-        }
-
-        this.player = player
-
-        return this.player
-
-    }
-
-    overlapPlayerWithMobs() {
-        this.physics.add.overlap(this.player.body, this.mobBodies, this.player.destroy, null, this)
-        this.physics.add.overlap(this.player.bulletBodies, this.mobBodies, this.player.bulletType.kill, null, this)
-    }
-
-    createScoreText() {
-         this.scoreText = this.add.text(30, 
-            10, 'Score: 0', {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '16px' 
-        });
-    }
-
-    create() {
-        this.explosionSound = this.sound.add('explosion_audio')
-        this.greenBulletSound = this.sound.add('green_bullet_audio')
-        this.score = 0
-        this.createAndDrowImage()
-        this.createAndPlaySound()
-        this.createMobs()
-        this.createExitGameButton()
-        this.createPlayer()
-        this.overlapPlayerWithMobs()
-        this.createScoreText()
-    }
-
-    updateMobs() {
-        this.mobs.forEach(mob => {
-            mob.update()
-        })
-    }
-
-    updateScoreText()
-    {
-        this.scoreText.setText('Score: ' + this.score)
-    }
-
-    update() {
-        this.updateMobs()
-        this.player.update()
-        this.updateScoreText()
-    }
-}
 
 let config = {
     type: Phaser.AUTO,
@@ -385,8 +377,9 @@ let config = {
             debug: false
         }
     },
-    scene: [BackgroundScene, GameScene]
+    scene: [BackgroundScene, InfoScene, GameScene]
 };
 
 
 let game = new Phaser.Game(config);
+
