@@ -107,14 +107,14 @@ class GameInfoButton extends GameButton {
 }
 
 class Bullet extends Phaser.Physics.Arcade.Sprite {
-	constructor(scene, x, y) {
-        super(scene, x, y, 'green-bullet')
+	constructor(scene, name, speed, x, y) {
+        super(scene, x, y, name)
 
-        this.speed = 800
-        this.animationFrames = scene.anims.generateFrameNumbers('green-bullet')
+        this.speed = speed
+        this.animationFrames = scene.anims.generateFrameNumbers(name)
 
         this.animation = scene.anims.create({
-            key: 'greenBulletAnimation',
+            key: name + 'Animation',
             frames: this.animationFrames,
             frameRate: 20,
             repeat: -1
@@ -137,8 +137,20 @@ class Bullet extends Phaser.Physics.Arcade.Sprite {
     }
 }
 
+class DidiBullet extends Bullet {
+        constructor(scene, x, y) {
+        super(scene, 'green-bullet', 800, x, y)
+    }
+}
+
+class FireBullet extends Bullet {
+        constructor(scene, x, y) {
+        super(scene, 'fire-bullet', 800, x, y)
+    }
+}
+
 class WeaponGun extends Phaser.GameObjects.Sprite {
-	constructor(scene, weapon, x, y, name) {
+	constructor(scene, x, y, name) {
         super(scene, x, y, name)
 
         this.animationFrames = scene.anims.generateFrameNumbers(name)
@@ -157,29 +169,23 @@ class WeaponGun extends Phaser.GameObjects.Sprite {
 }
 
 class Weapon {
-	constructor(scene, owner) {
+	constructor(scene, owner, leftGun, rightGun) {
 		this.owner = owner
 		this.scene = scene
 		this.firedBullets = this.scene.physics.add.group()
 
-		this.leftGun = new WeaponGun(this.scene, 
-			this, 
-			this.owner.x - this.owner.displayWidth / 2, 
-			this.owner.y - this.owner.displayHeight / 2, 
-			'green-bullet')
+		this.leftGun = leftGun
+		this.rightGun = rightGun
 
-		this.rightGun = new WeaponGun(this.scene, 
-			this, 
-			this.owner.x + this.owner.displayWidth / 2, 
-			this.owner.y - this.owner.displayHeight / 2, 
-			'green-bullet')
-	}
+        leftGun.weapon = this
+        rightGun.weapon = this
+    }
 
 	update() {
-		this.leftGun.x = this.owner.x - this.owner.displayWidth / 2
+		this.leftGun.x = this.owner.x - this.owner.displayWidth / 2 - this.leftGun.displayWidth / 2
 		this.leftGun.y = this.owner.y 
 
-		this.rightGun.x = this.owner.x + this.owner.displayWidth / 2
+		this.rightGun.x = this.owner.x + this.owner.displayWidth / 2 + this.rightGun.displayWidth / 2
 		this.rightGun.y = this.owner.y 
 
 		for (let i = 0; i < this.firedBullets.getChildren().length; i++) {
@@ -188,12 +194,98 @@ class Weapon {
 		
 	}
 
-	shoot() {
-		let bulletRight = new Bullet(this.scene, this.rightGun.x, this.rightGun.y)
-		let bulletLeft = new Bullet(this.scene, this.leftGun.x, this.leftGun.y)
-    	this.firedBullets.add(bulletLeft)
-    	this.firedBullets.add(bulletRight)
-	}
+    destroy() {
+        this.leftGun.destroy()
+        this.rightGun.destroy()
+    }
+}
+
+class DidiWeapon extends Weapon{
+    constructor(scene, owner) {
+        let leftGun = new WeaponGun(scene,  
+            owner.x - owner.displayWidth / 2, 
+            owner.y - owner.displayHeight / 2, 
+            'didi-weapon-left')
+
+        let rightGun = new WeaponGun(scene, 
+            owner.x + owner.displayWidth / 2, 
+            owner.y - owner.displayHeight / 2, 
+            'didi-weapon-right')
+
+        super(scene, owner, leftGun, rightGun)
+    }
+
+    shoot() {
+        let bulletRight = new DidiBullet(this.scene, this.rightGun.x, this.rightGun.y)
+        let bulletLeft = new DidiBullet(this.scene, this.leftGun.x, this.leftGun.y)
+        let bulletRightDouble = new DidiBullet(this.scene, this.rightGun.x + 10, this.rightGun.y)
+        let bulletLeftDouble = new DidiBullet(this.scene, this.leftGun.x - 10, this.leftGun.y)
+        this.firedBullets.add(bulletLeft)
+        this.firedBullets.add(bulletRight)
+        this.firedBullets.add(bulletLeftDouble)
+        this.firedBullets.add(bulletRightDouble)
+    }
+}
+
+class FireWeapon extends Weapon{
+    constructor(scene, owner) {
+        let leftGun = new WeaponGun(scene,  
+            owner.x - owner.displayWidth / 2, 
+            owner.y - owner.displayHeight / 2, 
+            'fire-weapon-left')
+
+        let rightGun = new WeaponGun(scene, 
+            owner.x + owner.displayWidth / 2, 
+            owner.y - owner.displayHeight / 2, 
+            'fire-weapon-right')
+
+        super(scene, owner, leftGun, rightGun)
+    }
+
+    shoot() {
+        let bulletRight = new FireBullet(this.scene, this.rightGun.x, this.rightGun.y)
+        let bulletLeft = new FireBullet(this.scene, this.leftGun.x, this.leftGun.y)
+        this.firedBullets.add(bulletLeft)
+        this.firedBullets.add(bulletRight)
+    }
+}
+
+
+class Booster extends Phaser.Physics.Arcade.Sprite {
+    constructor(scene, player, x, y) {
+        super(scene, x, y, 'booster')
+
+        this.speed = 500
+        this.animationFrames = scene.anims.generateFrameNumbers('booster')
+
+        this.animation = scene.anims.create({
+            key: 'boosterAnimation',
+            frames: this.animationFrames,
+            frameRate: 20,
+            repeat: -1
+        })
+
+        this.play(this.animation)
+
+        scene.add.existing(this)
+        this.physics = scene.physics.add.existing(this)
+
+        this.physics.setVelocity(this.speed, this.speed)
+        this.physics.setCollideWorldBounds(true)
+        this.physics.setBounce(1);
+
+        this.boost = Math.round(Math.random())
+
+        scene.physics.add.overlap(this, player, function(booster, player) {
+            player.receiveBooster(booster.boost)
+            booster.received()
+        })
+    }
+
+    received() {
+        console.log('Booster received')
+        this.destroy()
+    }
 }
 
 class Player extends Phaser.Physics.Arcade.Sprite {
@@ -218,7 +310,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     	this.setCollideWorldBounds(true)
 
-    	this.weapon = new Weapon(scene, this)
+    	this.weapon = new DidiWeapon(scene, this)
     }
 
     moveUp() {
@@ -262,12 +354,22 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.weapon.update()
     }
+
+    receiveBooster(boost) {
+        console.log('Player receive booster')
+        this.weapon.destroy()
+        
+        if (boost) {
+            this.weapon = new FireWeapon(this.scene, this)
+        } else {
+            this.weapon = new DidiWeapon(this.scene, this)
+        }
+    }
 }
 
 class InfoScene extends Phaser.Scene {
 	constructor() {
         super("infoScene")
-        console.log('Info scene created')
     }
 
     preload() {
@@ -307,6 +409,13 @@ class GameScene extends Phaser.Scene {
 
 	update() {
 		this.player.update()
+
+        let random = Math.random()
+        if (random > 0.1 && random < 0.2) {
+            if (!this.booster || !this.booster.active) {
+                this.booster = new Booster(this, this.player, 100, 100)
+            }
+        }
 	}
 }
 
@@ -322,34 +431,73 @@ class BackgroundScene extends Phaser.Scene {
 		this.height = this.sys.game.canvas.height
 
 		this.backgrundImageTexture = this.load.image('background', '/static/img/background.png')
+
         this.greenMobImageTexture = this.load.spritesheet('green-mob', '/static/img/green_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
+
         this.grayMobImageTexture = this.load.spritesheet('gray-mob', '/static/img/gray_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
+
         this.blueMobImageTexture = this.load.spritesheet('blue-mob', '/static/img/blue_spaceship.png', {
             frameWidth: 66,
             frameHeight: 66
         })
+
         this.explosionImageTexture = this.load.spritesheet('explosion', '/static/img/explosion.png', {
             frameWidth: 66,
             frameHeight: 66
         })
-        this.greenBulletImageTexture = this.load.spritesheet('green-bullet', '/static/img/green_bullet.png', {
-            frameWidth: 36,
-            frameHeight: 36
+
+        this.greenBulletImageTexture = this.load.spritesheet('green-bullet', '/static/img/didi_bullet.png', {
+            frameWidth: 5,
+            frameHeight: 12
         })
+
+        this.greenBulletImageTexture = this.load.spritesheet('didi-weapon-left', '/static/img/didi_weapon_left.png', {
+            frameWidth: 16,
+            frameHeight: 50
+        })
+
+        this.greenBulletImageTexture = this.load.spritesheet('didi-weapon-right', '/static/img/didi_weapon_right.png', {
+            frameWidth: 16,
+            frameHeight: 50
+        })
+
+        this.greenBulletImageTexture = this.load.spritesheet('fire-bullet', '/static/img/fire_bullet.png', {
+            frameWidth: 15,
+            frameHeight: 15
+        })
+
+        this.greenBulletImageTexture = this.load.spritesheet('fire-weapon-left', '/static/img/fire_weapon_left.png', {
+            frameWidth: 25,
+            frameHeight: 35
+        })
+
+        this.greenBulletImageTexture = this.load.spritesheet('fire-weapon-right', '/static/img/fire_weapon_right.png', {
+            frameWidth: 25,
+            frameHeight: 35
+        })
+
         this.playerImageTexture = this.load.spritesheet('player', '/static/img/player.png', {
-            frameWidth: 66,
-            frameHeight: 66
+            frameWidth: 80,
+            frameHeight: 100
+        })
+
+        this.boostermageTexture = this.load.spritesheet('booster', '/static/img/booster.png', {
+            frameWidth: 30,
+            frameHeight: 30
         })
 
         this.backgroundAudio = this.load.audio('background_audio', '/static/sound/background.mp3')
+
         this.menuAudio = this.load.audio('menu_audio', '/static/sound/menu.mp3')
+
         this.explosionAudio = this.load.audio('explosion_audio', '/static/sound/explosion.mp3')
+
         this.greenBulletAudio = this.load.audio('green_bullet_audio', '/static/sound/green_bullet.mp3')
 	}
 
