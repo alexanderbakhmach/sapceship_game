@@ -253,10 +253,31 @@ class FireWeapon extends Weapon{
 
 class Booster extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, player, x, y) {
+        
+        if (!x || !y) {
+            x = Phaser.Math.Between(10, scene.width - 10)
+            y = Phaser.Math.Between(10, scene.height - 10)
+        }
+
+        let upDown = Math.round(Math.random())
+        let leftRight = Math.round(Math.random())
+
         super(scene, x, y, 'booster')
 
         this.speed = 500
         this.animationFrames = scene.anims.generateFrameNumbers('booster')
+
+        if (upDown) {
+            this.velocityY = this.speed
+        } else {
+            this.velocityY = -this.speed
+        }
+
+        if (leftRight) {
+            this.velocityX = this.speed
+        } else {
+            this.velocityX = -this.speed
+        }
 
         this.animation = scene.anims.create({
             key: 'boosterAnimation',
@@ -270,7 +291,7 @@ class Booster extends Phaser.Physics.Arcade.Sprite {
         scene.add.existing(this)
         this.physics = scene.physics.add.existing(this)
 
-        this.physics.setVelocity(this.speed, this.speed)
+        this.physics.setVelocity(this.velocityX, this.velocityY)
         this.physics.setCollideWorldBounds(true)
         this.physics.setBounce(1);
 
@@ -288,8 +309,47 @@ class Booster extends Phaser.Physics.Arcade.Sprite {
     }
 }
 
+class Mob extends Phaser.Physics.Arcade.Sprite {
+    constructor(scene, x, y) {
+        if (!x || !y) {
+            x = Phaser.Math.Between(10, scene.width - 10)
+            y = 80
+        }
+
+        super(scene, x, y, 'joe-mob')
+
+        this.health = Phaser.Math.Between(10, 20)
+        this.speed = Phaser.Math.Between(70, 170)
+        this.animationFrames = scene.anims.generateFrameNumbers('joe-mob')
+        this.animation = scene.anims.create({
+            key: 'joeMobAnimation',
+            frames: this.animationFrames,
+            frameRate: 20,
+            repeat: -1
+        })
+        this.play(this.animation)
+
+        scene.add.existing(this)
+        this.physics = scene.physics.add.existing(this)
+        this.physics.setVelocity(0, this.speed)
+    }
+
+    update() {
+        if (this.y >= this.scene.height) {
+            this.y = 80
+            this.x = Phaser.Math.Between(10, this.scene.width - 10)
+        }
+    }
+}
+
 class Player extends Phaser.Physics.Arcade.Sprite {
 	constructor(scene, x, y) {
+
+        if (!x || !y) {
+            x = scene.width / 2
+            y = scene.height - 80
+        }
+
         super(scene, x, y, 'player')
 
         this.speed = 100
@@ -404,16 +464,18 @@ class GameScene extends Phaser.Scene {
 		this.gameExitButton = new GameExitButton(this, this.width - 70, 50, 'Exit');
 		this.add.existing(this.gameExitButton);
 
-		this.player = new Player(this, 40, 40)
+		this.player = new Player(this)
+        this.mob = new Mob(this)
 	}
 
 	update() {
 		this.player.update()
+        this.mob.update()
 
         let random = Math.random()
         if (random > 0.1 && random < 0.2) {
             if (!this.booster || !this.booster.active) {
-                this.booster = new Booster(this, this.player, 100, 100)
+                this.booster = new Booster(this, this.player)
             }
         }
 	}
@@ -485,6 +547,11 @@ class BackgroundScene extends Phaser.Scene {
         this.playerImageTexture = this.load.spritesheet('player', '/static/img/player.png', {
             frameWidth: 80,
             frameHeight: 100
+        })
+
+        this.joeMobImageTexture = this.load.spritesheet('joe-mob', '/static/img/joe_mob.png', {
+            frameWidth: 50,
+            frameHeight: 70
         })
 
         this.boostermageTexture = this.load.spritesheet('booster', '/static/img/booster.png', {
