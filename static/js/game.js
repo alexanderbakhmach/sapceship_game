@@ -20,7 +20,7 @@ class GameInfoText extends Phaser.GameObjects.Text {
 
 		if (!style) {
     		style = { 
-    			fill: '#0f0', 
+    			fill: '#ad03fc', 
     			fontFamily: '"Press Start 2P"', 
     			fontSize: '15px'
     		}
@@ -33,11 +33,49 @@ class GameInfoText extends Phaser.GameObjects.Text {
 	} 
 }
 
+class MobHealth extends Phaser.GameObjects.Text {
+    constructor(scene, x, y, text, style) {
+        if (!style) {
+            style = { 
+                fill: '#994b1a', 
+                fontFamily: '"Press Start 2P"', 
+                fontSize: '15px' 
+            }
+        }
+        super(scene, x, y, text, style)
+        this.setOrigin(0.5);
+    }
+
+    update(x, y, health) {
+        this.x = x
+        this.y = y
+        this.setText(health)
+    }
+}
+
+class Score extends Phaser.GameObjects.Text {
+    constructor(scene, score = 0) {
+        let style = { 
+            fill: '#ad03fc', 
+            fontFamily: '"Press Start 2P"', 
+            fontSize: '15px' 
+        }
+        let x = 10
+        let y = 10
+        let text = 'SCORE: ' + score
+        super(scene, x, y, text, style)
+    }
+
+    update(score) {
+        this.setText('SCORE: ' + score)
+    }
+}
+
 class GameButton extends Phaser.GameObjects.Text {
     constructor(scene, x, y, text, style) {
     	if (!style) {
     		style = { 
-    			fill: '#0f0', 
+    			fill: '#ad03fc', 
     			fontFamily: '"Press Start 2P"', 
     			fontSize: '25px' 
     		}
@@ -58,7 +96,7 @@ class GameButton extends Phaser.GameObjects.Text {
     }
 
     enterButtonRestState() {
-        this.setStyle({ fill: '#0f0'});
+        this.setStyle({ fill: '#ad03fc'});
     }
 
     enterButtonActiveState() {
@@ -107,9 +145,10 @@ class GameInfoButton extends GameButton {
 }
 
 class Bullet extends Phaser.Physics.Arcade.Sprite {
-	constructor(scene, name, speed, x, y) {
+	constructor(scene, name, speed, x, y, damage = 1) {
         super(scene, x, y, name)
 
+        this.damage = damage
         this.speed = speed
         this.animationFrames = scene.anims.generateFrameNumbers(name)
 
@@ -145,15 +184,18 @@ class DidiBullet extends Bullet {
 
 class FireBullet extends Bullet {
         constructor(scene, x, y) {
-        super(scene, 'fire-bullet', 800, x, y)
+        super(scene, 'fire-bullet', 800, x, y, 2)
     }
 }
 
 class WeaponGun extends Phaser.GameObjects.Sprite {
-	constructor(scene, x, y, name) {
+	constructor(scene, x, y, name, frames) {
         super(scene, x, y, name)
 
-        this.animationFrames = scene.anims.generateFrameNumbers(name)
+        this.animationFrames = scene.anims.generateFrameNumbers(name, {
+            start: 0,
+            end: frames
+        })
 
         this.animation = scene.anims.create({
             key: name + 'Animation',
@@ -174,6 +216,11 @@ class Weapon {
 		this.scene = scene
 		this.firedBullets = this.scene.physics.add.group()
 
+        this.scene.physics.add.overlap(this.firedBullets, this.owner.mobs, function(bullet, mob) {
+            mob.hit(bullet)
+            bullet.destroy()
+        })
+
 		this.leftGun = leftGun
 		this.rightGun = rightGun
 
@@ -182,11 +229,11 @@ class Weapon {
     }
 
 	update() {
-		this.leftGun.x = this.owner.x - this.owner.displayWidth / 2 - this.leftGun.displayWidth / 2
-		this.leftGun.y = this.owner.y 
+		this.leftGun.x = this.owner.x - this.owner.displayWidth / 2 - this.leftGun.displayWidth / 2 + 15
+		this.leftGun.y = this.owner.y - this.owner.displayHeight / 2
 
-		this.rightGun.x = this.owner.x + this.owner.displayWidth / 2 + this.rightGun.displayWidth / 2
-		this.rightGun.y = this.owner.y 
+		this.rightGun.x = this.owner.x + this.owner.displayWidth / 2 + this.rightGun.displayWidth / 2 - 15
+		this.rightGun.y = this.owner.y - this.owner.displayHeight / 2
 
 		for (let i = 0; i < this.firedBullets.getChildren().length; i++) {
         	this.firedBullets.getChildren()[i].update()
@@ -205,12 +252,12 @@ class DidiWeapon extends Weapon{
         let leftGun = new WeaponGun(scene,  
             owner.x - owner.displayWidth / 2, 
             owner.y - owner.displayHeight / 2, 
-            'didi-weapon-left')
+            'didi-weapon-left', 12)
 
         let rightGun = new WeaponGun(scene, 
             owner.x + owner.displayWidth / 2, 
             owner.y - owner.displayHeight / 2, 
-            'didi-weapon-right')
+            'didi-weapon-right', 12)
 
         super(scene, owner, leftGun, rightGun)
     }
@@ -232,12 +279,12 @@ class FireWeapon extends Weapon{
         let leftGun = new WeaponGun(scene,  
             owner.x - owner.displayWidth / 2, 
             owner.y - owner.displayHeight / 2, 
-            'fire-weapon-left')
+            'fire-weapon-left', 13)
 
         let rightGun = new WeaponGun(scene, 
             owner.x + owner.displayWidth / 2, 
             owner.y - owner.displayHeight / 2, 
-            'fire-weapon-right')
+            'fire-weapon-right', 13)
 
         super(scene, owner, leftGun, rightGun)
     }
@@ -310,40 +357,98 @@ class Booster extends Phaser.Physics.Arcade.Sprite {
 }
 
 class Mob extends Phaser.Physics.Arcade.Sprite {
-    constructor(scene, x, y) {
+    constructor(scene, group, name, x, y) {
         if (!x || !y) {
             x = Phaser.Math.Between(10, scene.width - 10)
             y = 80
         }
 
-        super(scene, x, y, 'joe-mob')
+        let random = Math.random()
 
-        this.health = Phaser.Math.Between(10, 20)
+        super(scene, x, y, name)
+
+        this.group = group
+        this.health = Phaser.Math.Between(10 + this.scene.gamePlayMod * 2, 20 + this.scene.gamePlayMod * 2)
         this.speed = Phaser.Math.Between(70, 170)
-        this.animationFrames = scene.anims.generateFrameNumbers('joe-mob')
+        this.animationFrames = scene.anims.generateFrameNumbers(name)
         this.animation = scene.anims.create({
-            key: 'joeMobAnimation',
+            key: name + 'MobAnimation',
             frames: this.animationFrames,
             frameRate: 20,
             repeat: -1
         })
+        this.updateSteps = 20
+        this.countSteps = 0
         this.play(this.animation)
 
+        this.group.add(this)
         scene.add.existing(this)
         this.physics = scene.physics.add.existing(this)
-        this.physics.setVelocity(0, this.speed)
+
+        if (random > 0.5) {
+            this.physics.setVelocity(100, this.speed)
+        } else {
+           this.physics.setVelocity(-100, this.speed)
+        }
+
+
+        this.healthText = new MobHealth(this.scene, this.x, this.y, this.health)
+        this.scene.add.existing(this.healthText)
     }
 
     update() {
+        this.countSteps += 1
+
         if (this.y >= this.scene.height) {
             this.y = 80
             this.x = Phaser.Math.Between(10, this.scene.width - 10)
         }
+
+        let random = Math.random()
+
+        if (this.countSteps > this.updateSteps) {
+            this.countSteps = 0
+            if (random > 0.5) {
+                this.physics.setVelocity(100, this.speed)
+            } else {
+                this.physics.setVelocity(-100, this.speed)
+            }
+        } 
+        this.healthText.update(this.x, this.y, this.health)
+    }
+
+    hit(bullet) {
+        this.health -= bullet.damage
+
+        if (this.health <= 0) {
+            this.scene.score += 10
+            this.scene.gamePlayMod += 1
+            this.healthText.destroy()
+            this.destroy()
+        }
+    }
+}
+
+class JoeMob extends Mob {
+    constructor(scene, group, x, y) {
+        super(scene, group, 'joe-mob', x, y)
+    }
+}
+
+class DinMob extends Mob {
+    constructor(scene, group, x, y) {
+        super(scene, group, 'din-mob', x, y)
+    }
+}
+
+class PiterMob extends Mob {
+    constructor(scene, group, x, y) {
+        super(scene, group, 'piter-mob', x, y)
     }
 }
 
 class Player extends Phaser.Physics.Arcade.Sprite {
-	constructor(scene, x, y) {
+	constructor(scene, mobs, x, y) {
 
         if (!x || !y) {
             x = scene.width / 2
@@ -352,8 +457,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
         super(scene, x, y, 'player')
 
-        this.speed = 100
-        this.animationFrames = scene.anims.generateFrameNumbers('player')
+        this.speed = 300
+        this.mobs = mobs
+        this.animationFrames = scene.anims.generateFrameNumbers('player', {
+            start: 0,
+            end: 29
+        })
         this.cursorKeys = this.scene.cursorKeys
 
         this.animation = scene.anims.create({
@@ -371,6 +480,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     	this.setCollideWorldBounds(true)
 
     	this.weapon = new DidiWeapon(scene, this)
+
+        this.scene.physics.add.overlap(this.mobs, this, function(player, mob) {
+            player.kill()
+        })
+    }
+
+    kill() {
+        this.scene.exit()
     }
 
     moveUp() {
@@ -411,7 +528,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
             	this.shoot()
             }
         }
-
+        
         this.weapon.update()
     }
 
@@ -439,6 +556,9 @@ class InfoScene extends Phaser.Scene {
     }
 
     create() {
+        this.backgroundImage = this.add.tileSprite(0, 0, this.width, this.height, 'background')
+        this.backgroundImage.setScale(1)
+        this.backgroundImage.setOrigin(0, 0)
 		this.gameExitButton = new GameExitButton(this, this.width / 2, this.height - 50, 'Exit');
 		this.gameInfoText = new GameInfoText(this, this.width / 2, this.height / 2);
 		this.add.existing(this.gameExitButton);
@@ -459,26 +579,59 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.backgroundImage = this.add.tileSprite(0, 0, this.width, this.height, 'background')
+        this.backgroundImage.setScale(1)
+        this.backgroundImage.setOrigin(0, 0)
+        this.score = 0
+        this.gamePlayMod = 1
     	this.cursorKeys = this.input.keyboard.createCursorKeys()
     	this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
-		this.gameExitButton = new GameExitButton(this, this.width - 70, 50, 'Exit');
-		this.add.existing(this.gameExitButton);
+		this.gameExitButton = new GameExitButton(this, this.width - 70, 50, 'Exit')
+        this.mobs = this.physics.add.group()
+		this.player = new Player(this, this.mobs)
+        this.scoreText = new Score(this)
 
-		this.player = new Player(this)
-        this.mob = new Mob(this)
-	}
+        new JoeMob(this, this.mobs)
+        new PiterMob(this, this.mobs)
+        new DinMob(this, this.mobs)
+
+        this.add.existing(this.gameExitButton);
+	    this.add.existing(this.scoreText)
+    }
 
 	update() {
-		this.player.update()
-        this.mob.update()
-
         let random = Math.random()
+
+		this.player.update()
+
+        if (this.mobs.getChildren().length < 3) {
+            let random = Math.random()
+            if (random <= 0.3) {
+                new DinMob(this, this.mobs)
+            } else if (random > 0.3 && random <= 0.7) {
+                new PiterMob(this, this.mobs)
+            } else {
+                new JoeMob(this, this.mobs)
+            }
+            
+        }
+
+        for (let i = 0; i < this.mobs.getChildren().length; i++) {
+            this.mobs.getChildren()[i].update()
+        }
+
         if (random > 0.1 && random < 0.2) {
             if (!this.booster || !this.booster.active) {
                 this.booster = new Booster(this, this.player)
             }
         }
+
+        this.scoreText.update(this.score)
 	}
+
+    exit() {
+        this.scene.start('backgroundScene', {score: this.score});
+    }
 }
 
 class BackgroundScene extends Phaser.Scene {
@@ -487,27 +640,17 @@ class BackgroundScene extends Phaser.Scene {
         console.log('Background scene created')
     }
 
+
+    init(data) {
+        this.score = data.score
+    }
+
 	preload() {
 		this.canvas = this.sys.game.canvas;
 		this.width = this.sys.game.canvas.width
 		this.height = this.sys.game.canvas.height
 
-		this.backgrundImageTexture = this.load.image('background', '/static/img/background.png')
-
-        this.greenMobImageTexture = this.load.spritesheet('green-mob', '/static/img/green_spaceship.png', {
-            frameWidth: 66,
-            frameHeight: 66
-        })
-
-        this.grayMobImageTexture = this.load.spritesheet('gray-mob', '/static/img/gray_spaceship.png', {
-            frameWidth: 66,
-            frameHeight: 66
-        })
-
-        this.blueMobImageTexture = this.load.spritesheet('blue-mob', '/static/img/blue_spaceship.png', {
-            frameWidth: 66,
-            frameHeight: 66
-        })
+		this.backgrundImageTexture = this.load.image('background', '/static/img/background.jpg')
 
         this.explosionImageTexture = this.load.spritesheet('explosion', '/static/img/explosion.png', {
             frameWidth: 66,
@@ -520,13 +663,13 @@ class BackgroundScene extends Phaser.Scene {
         })
 
         this.greenBulletImageTexture = this.load.spritesheet('didi-weapon-left', '/static/img/didi_weapon_left.png', {
-            frameWidth: 16,
-            frameHeight: 50
+            frameWidth: 10,
+            frameHeight: 100
         })
 
         this.greenBulletImageTexture = this.load.spritesheet('didi-weapon-right', '/static/img/didi_weapon_right.png', {
-            frameWidth: 16,
-            frameHeight: 50
+            frameWidth: 10,
+            frameHeight: 100
         })
 
         this.greenBulletImageTexture = this.load.spritesheet('fire-bullet', '/static/img/fire_bullet.png', {
@@ -535,21 +678,31 @@ class BackgroundScene extends Phaser.Scene {
         })
 
         this.greenBulletImageTexture = this.load.spritesheet('fire-weapon-left', '/static/img/fire_weapon_left.png', {
-            frameWidth: 25,
-            frameHeight: 35
+            frameWidth: 30,
+            frameHeight: 60
         })
 
         this.greenBulletImageTexture = this.load.spritesheet('fire-weapon-right', '/static/img/fire_weapon_right.png', {
-            frameWidth: 25,
-            frameHeight: 35
+            frameWidth: 30,
+            frameHeight: 60
         })
 
         this.playerImageTexture = this.load.spritesheet('player', '/static/img/player.png', {
-            frameWidth: 80,
-            frameHeight: 100
+            frameWidth: 50,
+            frameHeight: 90
         })
 
         this.joeMobImageTexture = this.load.spritesheet('joe-mob', '/static/img/joe_mob.png', {
+            frameWidth: 50,
+            frameHeight: 70
+        })
+
+        this.joeMobImageTexture = this.load.spritesheet('din-mob', '/static/img/din_mob.png', {
+            frameWidth: 50,
+            frameHeight: 70
+        })
+
+        this.joeMobImageTexture = this.load.spritesheet('piter-mob', '/static/img/piter_mob.png', {
             frameWidth: 50,
             frameHeight: 70
         })
@@ -560,19 +713,20 @@ class BackgroundScene extends Phaser.Scene {
         })
 
         this.backgroundAudio = this.load.audio('background_audio', '/static/sound/background.mp3')
-
-        this.menuAudio = this.load.audio('menu_audio', '/static/sound/menu.mp3')
-
-        this.explosionAudio = this.load.audio('explosion_audio', '/static/sound/explosion.mp3')
-
-        this.greenBulletAudio = this.load.audio('green_bullet_audio', '/static/sound/green_bullet.mp3')
 	}
 
 	create() {
-		this.gameStartButton = new GameStartButton(this, this.width / 2, this.height / 2 - 50, 'Start the new game');
-		this.gameInfoButton = new GameInfoButton(this, this.width / 2, this.height / 2 + 50, 'Game info');
-		this.add.existing(this.gameStartButton);
-		this.add.existing(this.gameInfoButton);
+        // this.backgroundSound = this.sound.add('background_audio', {loop: true})
+        // this.backgroundSound.play()
+        this.backgroundImage = this.add.tileSprite(0, 0, this.width, this.height, 'background')
+        this.backgroundImage.setScale(1)
+        this.backgroundImage.setOrigin(0, 0)
+		this.gameStartButton = new GameStartButton(this, this.width / 2, this.height / 2 - 50, 'Start the new game')
+		this.gameInfoButton = new GameInfoButton(this, this.width / 2, this.height / 2 + 50, 'Game info')
+        this.scoreText = new Score(this, this.score)
+		this.add.existing(this.gameStartButton)
+		this.add.existing(this.gameInfoButton)
+        this.add.existing(this.scoreText)
 	}
 }
 
